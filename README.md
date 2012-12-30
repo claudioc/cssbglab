@@ -1,5 +1,7 @@
 
-This just a single page application - a quick hack, really - to be able to easily play with
+##Claudio's CSS Background-Image lab
+
+This is just a single page application - a quick hack, really - to be able to easily play with
 the background-image CSS property on some predefined container dimensions
 (think about them as the templates for the most common used mobile device resolution).
 
