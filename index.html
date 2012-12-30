@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <title></title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <style>
+
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: silver;
+      font-size: 12px;
+    }
+
+    #main {
+      background-color: #f1f1f1;
+      width: 100px;
+      height: 100px;
+      margin: 0 auto;
+      -webkit-transition-property: all;
+      -webkit-transition-duration: 200ms;
+      -webkit-transition-timing-function: linear;
+      -moz-transition-property: all;
+      -moz-transition-timing-function: linear;
+      -moz-transition-duration: 200ms;
+      border: 5px solid gray;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      box-shadow: 0 0 5px black;
+    }
+
+    #properties {
+      display: table-cell;
+    }
+
+    .values {
+      margin: 0;
+      padding: 0;
+      display: inline-block;
+      background-color: #e1e1e1;
+      border-radius: 5px;
+      height: 25px;
+      margin-right: 15px;
+      padding: 5px;
+    }
+
+    .property {
+      float: left;
+      margin-bottom: 20px;
+     }
+ 
+    .property b {
+      color: gray;
+      background-color: #e1e1e1;
+      padding:4px 8px;
+      border-top-left-radius: 4px;
+      border-top-right-radius: 4px;
+     }
+
+    .property b a {
+      margin-left: 5px;
+      background-color: #ccc;
+      color: gray;
+      padding: 0 5px;
+      border-radius: 4px;
+      text-decoration: none;
+    }
+
+    .values li {
+      list-style-type: none;
+      display: inline-block;
+      padding:5px 8px;
+      cursor: pointer;
+      margin-left: 5px;
+      background-color: white;
+      border-radius: 4px;
+      box-shadow: 0px 0px 3px black;
+    }
+
+    .values li:first-child {
+      margin-left: 0;
+    }
+
+    .values li.input {
+      box-shadow: none;
+      padding: 0;
+    }
+
+    .values li.input input {
+      border: 1px solid silver;
+      border-radius: 2px;
+      padding: 2px 3px;
+
+    }
+
+    .values li i {
+      color: #aaa;
+      font-style: normal;
+    }
+
+    .values li.active {
+      background-color: green;
+      color: white;
+      box-shadow: 0px 0px 0px black;
+      position: relative;
+      top: 1px;
+    }
+
+    .values li.input.active {
+      background-color: transparent;
+    }
+
+    .values li:hover {
+      border-bottom: 4px solid green;
+    }
+
+    .values li.active:hover {
+      border-bottom-width: 0;
+    }
+
+    #original {
+      width: 150px;
+      margin: 0 auto;
+      display: block;
+    }
+
+    #code {
+      display: none;
+      color: gray;
+      z-index: -1;
+    }
+
+    </style>
+  </head>
+  <body>
+
+    <div id="properties"></div>
+
+    <a id="show-code" href="#">Show me the code</a>
+    <pre id="code"></pre>
+    <div id="main"></div>
+    <img id="original" src="#">
+
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1/jquery.min.js"></script>
+
+    <script>
+
+      var $main = $('#main');
+
+      var SessionData = {
+        data: {},
+
+        load: function() {
+          this.data = JSON.parse(window.localStorage.getItem("bglab-data"));
+          if (!this.data) {
+            this.data = {};
+            return null;
+          }
+          return this.data;
+        },
+
+        set: function(key, value) {
+          this.data[key] = value;
+          window.localStorage.setItem("bglab-data", JSON.stringify(this.data));
+          return this;
+        },
+
+        get: function(key) {
+          return this.data[key];
+        }
+      }
+
+      var CSSProperty = function(title, property) {
+
+        var $container = $("#properties")
+          , values = []
+          , $el = $('<div/>').addClass("property")
+          , current
+          , help
+          , isCSS = true
+          , formatter
+          , styler;
+
+        current = SessionData.get(property);
+
+        function _format(obj) {
+          if (formatter) {
+            return formatter.apply(obj);
+          } else {
+            return current;
+          }
+        };
+
+        function _style(obj) {
+          if (styler) {
+            return styler.apply(obj);
+          } else {
+            return function() {};
+          }
+        };
+
+        var customValue = SessionData.get(property + "-custom");
+        if (typeof customValue !== 'undefined' && null !== customValue) {
+          current = customValue;
+        }
+
+        return {
+
+          add: function(name, value, isInput, size) {
+            values.push({value: value, name: name, isInput: isInput, size: size || 40});
+            return this;
+          },
+
+          render: function() {
+            var _self = this;
+            $el.on("click", "li", function(evt) {
+              if ($(this).hasClass('input')) {
+                return;
+              }
+
+              current = $(this).data("value");
+              _self.activate(this);
+              _style(_self);
+              SessionData.set(property, current);
+              SessionData.set(property + '-custom', null);
+              App.showCode();
+            });
+
+            var $title = $("<b/>").text(title).appendTo($el);
+            if (help) {
+              $("<a>").attr('href', help).text("?").appendTo($title);
+            }
+            $el.append("<br/>");
+            var $list = $("<ul/>").attr("id", property).addClass("values");
+            var $active, $input;
+
+            values.forEach(function(val) {
+              var $li = $("<li>");
+              if (val.isInput) {
+                $li.addClass("input");
+                $input = $("<input/>").attr("type", "text").attr("size", val.size).attr("id", "custom-" + property);
+                $li.append($input);
+              } else {
+                $li.html(val.name).data("value", val.value);
+                if (val.value == current) {
+                  $active = $li;
+                }
+              }
+              $list.append($li);
+            });
+
+            if ($input) {
+              var _self = this;
+              $input.on("keypress", function(e) {
+                if (e.keyCode == 13) {
+                  current = $(this).val();
+                  _style(_self);
+                  $(this).parents("ul").find(".active").removeClass('active');
+                  SessionData.set(property, "custom");
+                  SessionData.set(property + '-custom', current);
+                  App.showCode();
+                }
+              });
+
+              $input.val(customValue);
+
+            }
+
+            $el.append($list);
+
+            $container.append($el);
+
+            $active && $active.addClass("active");
+
+            _style(this);
+
+            return this;
+          },
+
+          get current() {
+            return current;
+          },
+
+          set help(v) {
+            help = v;
+          },
+
+          set isCSS(v) {
+            isCSS = v;
+          },
+
+          get isCSS() {
+            return isCSS;
+          },
+
+          toString: function() {
+            if (!isCSS || current == '') {
+              return "";
+            }
+            return property + ": " + _format(this) + ";\n";
+          },
+
+          set styler(v) {
+            styler = v;
+          },
+
+          set formatter(v) {
+            formatter = v;
+          },
+
+          activate: function(el) {
+            $(el).parent().find(".active").removeClass('active');
+            $(el).addClass("active");
+          }
+
+        }
+      }
+
+      if (!SessionData.load()) {
+        SessionData.set('resolution', "320,480");
+        SessionData.set('orientation', "portrait");
+        SessionData.set('background-size', "");
+        SessionData.set('background-size-custom', null);
+        SessionData.set('background-position', "");
+        SessionData.set('background-position-custom', null);
+        SessionData.set('background-color', "white");
+        SessionData.set('background-color-custom', null);
+        SessionData.set('background-image', "http://cvcl.mit.edu/hybrid/cat2.jpg");
+        SessionData.set('background-repeat', "no-repeat");
+      }
+
+      var App = {
+
+        props: [],
+
+        $code: $("#code"),
+
+        start: function() {
+
+          this.props.forEach(function(prop) {
+            prop.render();
+          });
+
+          $("#show-code").on("click", function() {
+            this.$code.toggle();
+            $("#show-code").text(this.$code.is(":visible") ? "Hide code" : "Show code");
+            if (this.$code.is(":visible")) {
+              this.showCode();
+            }
+            return false;
+          }.bind(this));
+
+        },
+
+        showCode: function() {
+          this.$code.empty();
+
+          this.props.forEach(function(prop) {
+            if (!prop.isCSS) {
+              return;
+            }
+            this.$code.text(this.$code.text() + prop.toString());
+          }.bind(this));
+
+        },
+
+        add: function(prop) {
+          this.props.push(prop);
+        }
+
+      };
+
+      var prop;
+
+      prop = new CSSProperty("Background Image", "background-image");
+      prop.help = "https://developer.mozilla.org/en-US/docs/CSS/background-image";
+      prop.add("custom", "", true, 80);
+      prop.formatter = function() {
+        return "url(" + this.current + ")";
+      };
+      prop.styler = function() {
+        $main.css({"background-image": (this.current ? "url(" + this.current + ")" : "none")});
+        $("#original").attr("src", this.current);
+      };
+
+      App.add(prop);
+
+      prop = new CSSProperty("Orientation", "orientation");
+      prop.help = "https://developer.mozilla.org/en-US/docs/Detecting_device_orientation";
+      prop.add("Portrait", "portrait")
+          .add("Landscape", "landscape");
+      prop.styler = function() {
+        $main.get(0).className = "";
+        $main.addClass(this.current);
+        $main.css({width: $main.css("height"), height: $main.css("width")});
+      };
+      prop.isCSS = false;
+
+      App.add(prop);
+
+      prop = new CSSProperty("Resolution", "resolution");
+      prop.help = "http://developer.android.com/about/dashboards/index.html";
+      prop.add("320 <i>×</i> 480", "320,480")
+          .add("480 <i>×</i> 640", "480,640")
+          .add("480 <i>×</i> 800", "480,800")
+          .add("640 <i>×</i> 960", "640,960")
+          .add("640 <i>×</i> 1136", "640,1136")
+          .add("720 <i>×</i> 1280", "720,1280")
+          .add("800 <i>×</i> 1280", "800,1280");
+      prop.styler = function() {
+        var dim = this.current.split(",");
+        $main.css({width: dim[$(main).hasClass('portrait') ? 0 : 1], height: dim[$(main).hasClass('portrait') ? 1 : 0]});
+      };
+      prop.isCSS = false;
+
+      App.add(prop);
+
+      prop = new CSSProperty("Background Size", "background-size");
+      prop.help = "https://developer.mozilla.org/en-US/docs/CSS/background-size";
+      prop.add("Cover", "cover")
+          .add("Contain", "contain")
+          .add("Auto", "auto")
+          .add("100%", "100%")
+          .add("custom", "", true, 10);
+      prop.styler = function() {
+        if (this.current == "") {
+          return;
+        }
+        var p0 = $main.css("background-size");
+        $main.css({"background-size": this.current});
+        var p1 = $main.css("background-size");
+        if (p0 == p1 && p0 != this.current) {
+          $("#custom-bg-size").css({"border-color": "red"})
+          console.log("Unable to set the background-size to " + this.current);
+        } else {
+          $("#custom-bg-size").css({"border-color": "green"})
+        }
+      };
+
+      App.add(prop);
+
+      prop = new CSSProperty("Background Position", "background-position");
+      prop.help = "https://developer.mozilla.org/en-US/docs/CSS/background-position";
+      prop.add("Top", "top")
+          .add("Center", "center")
+          .add("Bottom", "bottom")
+          .add("Left", "left")
+          .add("Right", "right")
+          .add("custom", "", true, 10);
+      prop.styler = function() {
+        $main.css({"background-position": this.current});
+      };
+
+      App.add(prop);
+
+      prop = new CSSProperty("Background Color", "background-color");
+      prop.help = "https://developer.mozilla.org/en-US/docs/CSS/background-color";
+      prop.add("White", "white")
+          .add("Black", "black")
+          .add("Transp.", "transparent")
+          .add("custom", "", true, 5);
+      prop.styler = function() {
+        $main.css({"background-color": this.current});
+      };
+
+      App.add(prop);
+
+      prop = new CSSProperty("Background Repeat", "background-repeat");
+      prop.help = "https://developer.mozilla.org/en-US/docs/CSS/background-repeat";
+      prop.add("No", "no-repeat")
+          .add("Yes", "repeat")
+          .add("X", "repeat-x")
+          .add("Y", "repeat-y")
+          .add("Round", "round")
+          .add("Space", "space");
+      prop.styler = function() {
+        $main.css({"background-repeat": this.current});
+      };
+
+      App.add(prop);
+
+      App.start();
+
+    </script>
+
+  </body>
+</html>
