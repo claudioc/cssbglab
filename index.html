@@ -12,6 +12,7 @@
       padding: 20px;
       background-color: silver;
       font-size: 12px;
+      background-image: url(bg.gif)
     }
 
     #main {
@@ -52,7 +53,7 @@
      }
  
     .property b {
-      color: gray;
+      color: green;
       background-color: #e1e1e1;
       padding:4px 8px;
       border-top-left-radius: 4px;
@@ -86,6 +87,10 @@
     .values li.input {
       box-shadow: none;
       padding: 0;
+    }
+
+    .values li.input span {
+      color: gray;
     }
 
     .values li.input input {
@@ -132,17 +137,30 @@
       z-index: -1;
     }
 
+    #images-backlog li {
+      cursor: pointer;
+      color: gray;
+      font-size: 120%;
+      margin-bottom: 5px;
+    }
+
+    #images-backlog li:hover {
+      color: green;
+    }
+
     </style>
   </head>
   <body>
 
     <div id="properties"></div>
 
+    <a id="reset" href="#">Reset</a>
     <a id="show-code" href="#">Show me the code</a>
     <pre id="code"></pre>
     <div id="main"></div>
     <img id="original" src="#">
-
+    <h3>Images backlog</h3>
+    <ul id="images-backlog"></ul>
     <script src="http://ajax.googleapis.com/ajax/libs/jquery/1/jquery.min.js"></script>
 
     <script>
@@ -159,6 +177,16 @@
             return null;
           }
           return this.data;
+        },
+
+        reset: function() {
+          window.localStorage.removeItem("bglab-data");
+        },
+
+        mustExist: function(key, def) {
+          if (typeof this.get(key) == 'undefined') {
+            this.set(key, def);
+          }
         },
 
         set: function(key, value) {
@@ -180,6 +208,7 @@
           , current
           , help
           , isCSS = true
+          , onChange
           , formatter
           , styler;
 
@@ -198,6 +227,12 @@
             return styler.apply(obj);
           } else {
             return function() {};
+          }
+        };
+
+        function _onChange(obj, newValue) {
+          if (onChange && typeof onChange == 'function') {
+            return onChange.apply(obj, [newValue]);
           }
         };
 
@@ -225,6 +260,7 @@
               _style(_self);
               SessionData.set(property, current);
               SessionData.set(property + '-custom', null);
+              _onChange(_self, current);
               App.showCode();
             });
 
@@ -242,6 +278,7 @@
                 $li.addClass("input");
                 $input = $("<input/>").attr("type", "text").attr("size", val.size).attr("id", "custom-" + property);
                 $li.append($input);
+                $li.append("<span>&nbsp;&crarr;&nbsp;</span>")
               } else {
                 $li.html(val.name).data("value", val.value);
                 if (val.value == current) {
@@ -260,12 +297,12 @@
                   $(this).parents("ul").find(".active").removeClass('active');
                   SessionData.set(property, "custom");
                   SessionData.set(property + '-custom', current);
+                  _onChange(_self, current);
                   App.showCode();
                 }
               });
 
               $input.val(customValue);
-
             }
 
             $el.append($list);
@@ -310,6 +347,10 @@
             formatter = v;
           },
 
+          set onChange(f) {
+            onChange = f;
+          },
+
           activate: function(el) {
             $(el).parent().find(".active").removeClass('active');
             $(el).addClass("active");
@@ -318,18 +359,19 @@
         }
       }
 
-      if (!SessionData.load()) {
-        SessionData.set('resolution', "320,480");
-        SessionData.set('orientation', "portrait");
-        SessionData.set('background-size', "");
-        SessionData.set('background-size-custom', null);
-        SessionData.set('background-position', "");
-        SessionData.set('background-position-custom', null);
-        SessionData.set('background-color', "white");
-        SessionData.set('background-color-custom', null);
-        SessionData.set('background-image', "http://lab.web20.it/bg/cat2.jpg");
-        SessionData.set('background-repeat', "no-repeat");
-      }
+      SessionData.load();
+
+      SessionData.mustExist('resolution', "320,480");
+      SessionData.mustExist('orientation', "portrait");
+      SessionData.mustExist('background-size', "");
+      SessionData.mustExist('background-size-custom', null);
+      SessionData.mustExist('background-position', "");
+      SessionData.mustExist('background-position-custom', null);
+      SessionData.mustExist('background-color', "white");
+      SessionData.mustExist('background-color-custom', null);
+      SessionData.mustExist('background-image', "http://lab.web20.it/bg/cat2.jpg");
+      SessionData.mustExist('background-repeat', "no-repeat");
+      SessionData.mustExist('images-backlog', []);
 
       var App = {
 
@@ -352,6 +394,13 @@
             return false;
           }.bind(this));
 
+          $("#reset").on("click", function() {
+            SessionData.reset();
+            window.location.reload();
+            return false;
+          }.bind(this));
+
+          this.refreshImagesBacklog();
         },
 
         showCode: function() {
@@ -368,6 +417,22 @@
 
         add: function(prop) {
           this.props.push(prop);
+        },
+
+        refreshImagesBacklog: function() {
+          var $ib = $('#images-backlog')
+            , ib = SessionData.get('images-backlog');
+
+          $ib.empty();
+          ib.reverse().forEach(function(val) {
+            var $li = $('<li>' + val + '</li>');
+            $li.on("click", function() {
+              $('#custom-background-image').val($(this).text()).focus();
+              window.scrollTo(0,1);
+            });
+            $li.appendTo($ib);
+          });
+
         }
 
       };
@@ -383,6 +448,14 @@
       prop.styler = function() {
         $main.css({"background-image": (this.current ? "url(" + this.current + ")" : "none")});
         $("#original").attr("src", this.current);
+      };
+      prop.onChange = function(value) {
+        var ib = SessionData.get('images-backlog');
+        if (ib.indexOf(value) == -1) {
+          ib.push(value);
+          SessionData.set('images-backlog', ib);
+          App.refreshImagesBacklog();
+        }
       };
 
       App.add(prop);
